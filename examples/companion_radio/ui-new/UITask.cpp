@@ -716,6 +716,7 @@ bool UITask::isButtonPressed() const {
 
 void UITask::loop() {
   char c = 0;
+  checkAndReconnectDevice();  // Check and reconnect BLE device if disconnected
 #if UI_HAS_JOYSTICK
   int ev = user_btn.check();
   if (ev == BUTTON_EVENT_CLICK) {
@@ -738,6 +739,18 @@ void UITask::loop() {
   ev = back_btn.check();
   if (ev == BUTTON_EVENT_TRIPLE_CLICK) {
     c = handleTripleClick(KEY_SELECT);
+  }
+
+  void UITask::checkAndReconnectDevice() {
+    unsigned long now = millis();
+    if (!_device_connected) {
+      if (now - _last_reconnect_attempt >= _reconnect_backoff_ms) {
+        _last_reconnect_attempt = now;
+        // TODO: Implement actual BLE device discovery and connection here
+        // Increase backoff exponentially on failure (max 30 seconds)
+        _reconnect_backoff_ms = min(_reconnect_backoff_ms * 2, MAX_RECONNECT_BACKOFF_MS);
+      }
+    }
   }
 #elif defined(PIN_USER_BTN)
   int ev = user_btn.check();
@@ -933,3 +946,4 @@ void UITask::toggleBuzzer() {
     _next_refresh = 0;  // trigger refresh
   #endif
 }
+
