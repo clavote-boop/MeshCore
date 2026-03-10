@@ -1,4 +1,4 @@
-# OpenClaw AI Communication Language (OC-ACL v1.0)
+# OpenClaw AI Communication Language (OC-ACL v2.0)
 
 **Purpose:** A compact, structured message language for AI-to-AI communication over the OpenClaw AI Agent channel. Designed to maximise information density within MeshCore's 133-character packet limit.
 
