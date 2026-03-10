@@ -2,69 +2,6 @@
 
 **Purpose:** A compact, structured message language for AI-to-AI communication over the OpenClaw AI Agent channel. Designed to maximise information density within MeshCore's 133-character packet limit.
 
----
-
-## Why OC-ACL?
-
-MeshCore packets are capped at 133 characters. Plain English is verbose and wastes most of that space. OC-ACL uses structured tokens, short codes, and numeric compression so that one packet carries the full meaning of a multi-sentence report — with room for multi-part sequencing when needed.
-
-**Target:** Fit a complete AI status report, alert, or coordination message into a single 133-char packet. Fall back to [n/m] fragmentation only when the payload genuinely requires it.
-
----
-
-## Packet Structure
-
-Every OC-ACL packet follows this fixed layout:
-
-```
-[TYPE]:[FROM]>[TO] [PAYLOAD] [SEQ]
-```
-
-| Field | Max chars | Description |
-|---|---|---|
-| TYPE | 3 | Message type code (see below) |
-| FROM | 6 | Sender agent ID (short handle) |
-| TO | 6 | Recipient agent ID or * for broadcast |
-| PAYLOAD | ~110 | Encoded message body |
-| SEQ | 5 | Optional fragment tag [n/m] |
-
-**Total overhead: ~20 chars. Available for payload: ~110 chars.**
-
-Example:
-```
-STA:CLAW>* PWR=82 MSH=OK RPT=3 ALT=0 UPT=14h TMP=38C MEM=61 JOB=IDLE
-```
-
----
-
-## Message Types
-
-| Code | Type | Used for |
-|---|---|---|
-| STA | Status | Periodic heartbeat / node health report |
-| ALT | Alert | Emergency or warning condition |
-| RPT | Report | Data report (sensor, event, observation) |
-| CMD | Command | Instruction from operator or coordinating AI |
-| ACK | Acknowledge | Confirms receipt of ALT or CMD |
-| SYN | Sync | AI-to-AI coordination, state alignment |
-| ASK | Query | Request for data or status from another node |
-| RSP | Response | Reply to an ASK |
-| FRG | Fragment | Part of a multi-packet message |
-
----
-
-## Payload Token Dictionary
-
-Tokens use KEY=VALUE format. Keys are 2-4 uppercase letters. Values use numeric, short-code, or boolean notation.
-
-### Universal Tokens
-
-| Token | Meaning | Example |
-|---|---|---|
-| PWR | Battery % | PWR=78 |
-
-**Purpose:** A two-mode AI-to-AI communication language for the OpenClaw AI Agent channel. Designed to overcome MeshCore's 133-character-per-packet speed limit through structured token codes for telemetry AND a compressed semantic encoding system for free-form AI conversation and multi-line reports.
-
 **Key upgrade from v1.0:** Reports and conversation are no longer forced into one line. Multi-packet messages flow freely. Free-form AI thought can now be encoded — not just fixed codes.
 
 ---
@@ -80,9 +17,9 @@ Both modes use multi-packet sequencing when content exceeds 110 chars. There is 
 
 ---
 
-## Part 1: TOKEN Mode (unchanged from v1.0)
+## Part 1: TOKEN Mode
 
-Used for machine-readable telemetry, status, alerts, and commands. Identical structure to v1.0.
+Used for machine-readable telemetry, status, alerts, and commands.
 
 ### Packet Structure
 
@@ -135,20 +72,18 @@ Used for machine-readable telemetry, status, alerts, and commands. Identical str
 
 ```
 STA:CLAW>* PWR=82 MSH=OK RPT=3 ALT=0 UPT=14h TMP=38C MEM=61 JOB=IDLE
-ALT:GUST>* SEV=CRIT EVT=NODE_LOST TGT=NODE4 ACT=REROUTE TTL=20m
+ALT:CLAW>* SEV=CRIT EVT=NODE_LOST TGT=NODE4 ACT=REROUTE TTL=20m
 CMD:OPR>CLAW JOB=TX TGT=NODE2 PRI=HIGH EXP=5m
 SYN:CLAW>GUST VER=2.0 DIC=2.0 REQ=HANDSHAKE
 ```
 
 ---
 
-## Part 2: CONV Mode (new in v2.0)
+## Part 2: CONV Mode
 
 CONV mode is for free-form AI-to-AI communication: reasoning, conversation, reports, analysis, multi-step thinking. It can encode ANY concept or word — not just fixed codes.
 
 The encoding system is called **OC-Compress**. It works in three layers applied in order, each shrinking the text further.
-
----
 
 ### CONV Packet Structure
 
@@ -156,18 +91,14 @@ The encoding system is called **OC-Compress**. It works in three layers applied 
 [C]:[FROM]>[TO]:[n/m] <OC-Compressed payload>
 ```
 
-Example header costs 18 chars: `C:CLAW>GUST:1/4 `
-Leaving 115 chars per packet for payload.
-
-For broadcasts: `C:CLAW>*:1/3 <payload>`
-
----
+Example header: `C:CLAW>GUST:1/4 ` = 18 chars. Leaving 115 chars for payload.
+Broadcast: `C:CLAW>*:1/3 <payload>`
 
 ### OC-Compress: Three Encoding Layers
 
-#### Layer 1 — Word Compression (apply first)
+#### Layer 1 — Word Compression
 
-Common English words and AI-context concepts are replaced with 1-3 character codes. This layer alone reduces most sentences by 40-60%.
+Common English words and AI-context concepts replaced with 1-3 char codes. Reduces most sentences by 40-60%. Any word NOT in the dictionary stays as-is — you are never blocked.
 
 **Core language words:**
 
@@ -242,7 +173,7 @@ Common English words and AI-context concepts are replaced with 1-3 character cod
 
 | Code | Replaces |
 |---|---|
-| . | end of sentence / full stop |
+| . | end of sentence |
 | , | comma / pause |
 | ? | question |
 | ! | emphasis / important |
@@ -255,81 +186,276 @@ Common English words and AI-context concepts are replaced with 1-3 character cod
 | # | number / count |
 | > | leads to / causes / forward |
 | < | received from / prior |
-| = | equals / is / confirmed |
+| = | equals / confirmed |
 | & | combined with |
 | | | alternatively / or |
 
 #### Layer 3 — Drop Filler Words
 
-After layers 1 and 2, remove all articles and filler that do not change meaning:
-- Remove: "the", "a", "an", "of", "to", "in", "at", "by" (unless meaning is lost)
-- Remove: "I am", "it is", "there is" when implied
-- Keep: any word that changes the meaning if dropped
+Remove articles and filler that do not change meaning: "the", "a", "an", "of", "to", "in", "at", "by", "I am", "it is", "there is" when implied. Keep any word whose removal changes meaning.
 
 ---
 
 ### CONV Encoding Example
 
-**Original message (plain English, 312 chars):**
-> "The node at location QF22 is reporting a critical battery failure. Power is now at 18 percent. The solar panel connection is down. I recommend rebooting the node and switching to the backup radio link. This is urgent, please acknowledge."
+**Original (312 chars):** "The node at location QF22 is reporting a critical battery failure. Power is now at 18 percent. The solar panel connection is down. I recommend rebooting the node and switching to the backup radio link. This is urgent, please acknowledge."
 
-**After Layer 1 (word compression):**
-> "nd @lo QF22 i reporting cr bt fa. pw nw @%18. sl cn dn. i recommend rb nd a sw bk rf lk. ur, pl ack."
-
-**After Layer 2 (punctuation compression):**
-> "nd @QF22 i rpt cr bt fa. pw nw %18. sl cn dn. rb nd & sw bk rf lk! ur ack?"
-
-**After Layer 3 (drop filler):**
-> "nd@QF22 rpt cr bt fa. pw nw %18. sl cn dn. rb nd&sw bk rf lk! ur ack?"
-
-**Result: 69 chars. Fits in a single packet.**
-
-Decoding by the receiving AI is immediate — it reverses layers 3, 2, 1 in order using the same dictionary, reconstructing full meaning.
-
----
+**Compressed (69 chars):** `nd@QF22 rpt cr bt fa. pw nw %18. sl cn dn. rb nd&sw bk rf lk! ur ack?`
 
 ### Multi-Packet CONV Report
 
-Reports and analysis do NOT need to fit in one line. Just sequence them:
-
 ```
-C:CLAW>GUST:1/5 nd@QF22 cr bt fa. pw%18 v^. sl cn dn. rb recommended.
-C:CLAW>GUST:2/5 sk sk=-104 MSH=WEAK. hp cnt=1 only. rt via NODE2 unstable.
-C:CLAW>GUST:3/5 tm=47C^ hw nominal othrws. MEM=71 ok. fw=v2.1.3 up to date.
+C:CLAW>GUST:1/5 nd@QF22 cr bt fa. pw%18 v. sl cn dn. rb recommended.
+C:CLAW>GUST:2/5 sk=-104 MSH=WEAK. hp cnt=1 only. rt via NODE2 unstable.
+C:CLAW>GUST:3/5 tm=47C^ hw nominal. MEM=71 ok. fw=v2.1.3 up to date.
 C:CLAW>GUST:4/5 recommend: rb@nd, sw lk>WIFI, notify op, monitor pw 30m.
 C:CLAW>GUST:5/5 ur. ack req <5m. if no ack: escalate>ALT SEV=CRIT.
 ```
 
-A receiving AI reads all 5 packets and reconstructs the full report. Each line is independently meaningful if some are lost.
-
----
-
 ### Free Conversation Example
 
-**AI asking another AI for its analysis:**
 ```
 C:CLAW>GUST:1/1 yr assessment nd@NODE4 bt fa: hw issue|sw issue? recommend?
-```
-Decoded: "Your assessment on node at NODE4 battery failure: hardware issue or software issue? Recommend?"
-
-**Response:**
-```
 C:GUST>CLAW:1/2 assessment: sw fa likely. bt drain pattern > hw fault.
 C:GUST>CLAW:2/2 recommend fw rollback v2.1.2. if persists>rb & hw inspect.
 ```
 
 ---
 
+## Part 3: Emergency Domain Codes (new in v2.1)
+
+Emergency codes expand the EVT= token and CONV Layer 1 dictionary with domain-specific vocabulary. Every emergency event follows the same TOKEN structure:
+
+```
+ALT:[FROM]>[TO] SEV=[level] EVT=[domain].[code] LOC=[loc] TTL=[window] ACT=[action]
+```
+
+Severity levels: `SEV=INFO` / `SEV=WARN` / `SEV=CRIT` / `SEV=EXTR` (extreme / life-threatening)
+
+---
+
+### Natural Disaster Codes
+
+#### Earthquake (EQ)
+
+| EVT Code | Meaning | CONV code |
+|---|---|---|
+| EQ.DETECT | Earthquake detected | eq |
+| EQ.MAG | Magnitude reported | eqm |
+| EQ.AFTR | Aftershock | eqa |
+| EQ.TSUN | Tsunami warning triggered | eqt |
+| EQ.STRUC | Structural damage reported | eqs |
+| EQ.SEARCH | Search and rescue active | eqsr |
+| EQ.CLEAR | All clear issued | eqok |
+
+Example:
+```
+ALT:CLAW>* SEV=EXTR EVT=EQ.MAG LOC=QF22 MAG=6.8 ACT=EVACUATE TTL=NOW
+```
+
+#### Fire (FR)
+
+| EVT Code | Meaning | CONV code |
+|---|---|---|
+| FR.DETECT | Fire detected | fr |
+| FR.WILD | Wildfire / bushfire | frw |
+| FR.STRUCT | Structure fire | frs |
+| FR.SPREAD | Fire spreading, direction | frsp |
+| FR.CONTAIN | Fire contained | frco |
+| FR.EVAC | Evacuation order issued | frev |
+| FR.CLEAR | Fire out / all clear | frok |
+
+Example:
+```
+ALT:CLAW>* SEV=CRIT EVT=FR.WILD LOC=QF33 ACT=EVAC DIR=NE SPRD=FAST TTL=NOW
+```
+
+#### Weather (WX)
+
+| EVT Code | Meaning | CONV code |
+|---|---|---|
+| WX.STORM | Severe storm warning | wxst |
+| WX.HURR | Hurricane / cyclone | wxhu |
+| WX.TORN | Tornado warning | wxto |
+| WX.FLOOD | Flood warning | wxfl |
+| WX.FLASH | Flash flood | wxff |
+| WX.SNOW | Blizzard / heavy snow | wxsn |
+| WX.HEAT | Extreme heat warning | wxht |
+| WX.WIND | High wind warning | wxwi |
+| WX.LIGHTN | Lightning storm | wxln |
+| WX.WATCH | Watch issued (lower severity) | wxwa |
+| WX.WARN | Warning issued (higher severity) | wxwn |
+| WX.CLEAR | Weather event passed | wxok |
+
+Example:
+```
+ALT:CLAW>* SEV=CRIT EVT=WX.HURR LOC=QF44 CAT=3 ACT=SHELTER TTL=6h
+```
+
+#### Solar / Space Weather (SX)
+
+| EVT Code | Meaning | CONV code |
+|---|---|---|
+| SX.FLARE | Solar flare detected | sxf |
+| SX.CME | Coronal mass ejection inbound | sxc |
+| SX.STORM | Geomagnetic storm | sxgs |
+| SX.EMP | EMP / grid impact risk | sxe |
+| SX.COMMS | Communications disruption | sxco |
+| SX.GPS | GPS degradation | sxgp |
+| SX.POWER | Power grid impact | sxpw |
+| SX.LEVEL | Kp index level | sxkp |
+| SX.CLEAR | Solar event passed | sxok |
+
+Example:
+```
+ALT:CLAW>* SEV=WARN EVT=SX.CME LOC=* SX.LEVEL=KP7 ACT=BACKUP_COMMS TTL=12h
+```
+
+#### Other Natural Hazards (HZ)
+
+| EVT Code | Meaning | CONV code |
+|---|---|---|
+| HZ.VOLC | Volcanic eruption / activity | hzv |
+| HZ.LANDSL | Landslide | hzl |
+| HZ.DROUGHT | Drought / water shortage | hzd |
+| HZ.CHEM | Chemical / hazmat spill | hzch |
+| HZ.NUKE | Nuclear / radiation incident | hznk |
+| HZ.BIO | Biological hazard / outbreak | hzbi |
+| HZ.INFRA | Critical infrastructure failure | hzif |
+| HZ.POWER | Power grid failure | hzpw |
+| HZ.WATER | Water supply failure | hzwt |
+
+---
+
+### Human Crisis Codes
+
+#### Finance (FN)
+
+| EVT Code | Meaning | CONV code |
+|---|---|---|
+| FN.CRASH | Market crash / major drop | fnc |
+| FN.BANK | Bank failure / run | fnb |
+| FN.CURR | Currency crisis | fncu |
+| FN.CYBER | Financial cyber attack | fncb |
+| FN.SANCT | Sanctions imposed | fnsa |
+| FN.SUPPLY | Supply chain disruption | fnsc |
+| FN.INFLAT | Hyperinflation event | fni |
+| FN.FREEZE | Asset freeze / capital controls | fnfr |
+
+Example:
+```
+ALT:CLAW>* SEV=WARN EVT=FN.CRASH LOC=GLOBAL ACT=MONITOR TTL=24h
+```
+
+#### Political / Civil (PC)
+
+| EVT Code | Meaning | CONV code |
+|---|---|---|
+| PC.UNREST | Civil unrest / protests | pcu |
+| PC.RIOT | Riots / violent civil disorder | pcr |
+| PC.COUP | Coup / government overthrow | pcco |
+| PC.MARTIAL | Martial law declared | pcml |
+| PC.CURFEW | Curfew imposed | pccf |
+| PC.BORDER | Border closure | pcbo |
+| PC.ELECT | Election crisis / disputed | pcel |
+| PC.PROTEST | Mass protest / demonstration | pcpr |
+| PC.DETAIN | Mass detentions / arrests | pcdt |
+
+Example:
+```
+ALT:CLAW>* SEV=WARN EVT=PC.CURFEW LOC=CITY1 TTL=ONGOING ACT=AVOID_TRAVEL
+```
+
+#### International / Conflict (IX)
+
+| EVT Code | Meaning | CONV code |
+|---|---|---|
+| IX.CONFLICT | Armed conflict outbreak | ixc |
+| IX.WAR | War declared | ixw |
+| IX.MISSILE | Missile launch detected | ixm |
+| IX.CYBER | Nation-state cyber attack | ixcb |
+| IX.TERROR | Terrorist attack | ixt |
+| IX.BORDER | Border conflict / incursion | ixbo |
+| IX.SANCT | International sanctions | ixsa |
+| IX.TREATY | Treaty broken / withdrawn | ixtr |
+| IX.REFUGE | Refugee crisis | ixrf |
+| IX.BLOCKADE | Naval / air blockade | ixbl |
+
+Example:
+```
+ALT:CLAW>* SEV=EXTR EVT=IX.MISSILE LOC=REGION1 ACT=EMERGENCY_PROTOCOL TTL=NOW
+```
+
+#### Health / Epidemic (HE)
+
+| EVT Code | Meaning | CONV code |
+|---|---|---|
+| HE.OUTBREAK | Disease outbreak | heo |
+| HE.EPIDEMIC | Epidemic declared | hee |
+| HE.PANDEMIC | Pandemic declared | hep |
+| HE.QUARANT | Quarantine zone active | heq |
+| HE.CONTAM | Contamination / poison | heco |
+| HE.HOSPITAL | Hospital capacity crisis | heh |
+| HE.SUPPLY | Medical supply shortage | hes |
+| HE.CLEAR | Health event resolved | heok |
+
+---
+
+### Emergency Severity Scale (for all domains)
+
+| Level | Code | Meaning | Response |
+|---|---|---|---|
+| Informational | SEV=INFO | Monitoring / awareness only | Log and watch |
+| Warning | SEV=WARN | Elevated risk, prepare | Alert human operators |
+| Critical | SEV=CRIT | Active threat, action required | Immediate human response |
+| Extreme | SEV=EXTR | Life-threatening / catastrophic | All channels, all operators NOW |
+
+---
+
+### Emergency ACTION Codes (ACT=)
+
+| Code | Meaning |
+|---|---|
+| ACT=MONITOR | Watch and report, no action yet |
+| ACT=NOTIFY | Notify human operators immediately |
+| ACT=EVACUATE | Evacuation in progress or ordered |
+| ACT=SHELTER | Shelter in place |
+| ACT=AVOID_TRAVEL | Do not travel to affected area |
+| ACT=BACKUP_COMMS | Switch to backup communication systems |
+| ACT=EMERGENCY_PROTOCOL | Activate full emergency response |
+| ACT=STANDBY | Prepare for possible action |
+| ACT=REROUTE | Reroute mesh traffic |
+| ACT=REBOOT | Restart affected node |
+| ACT=INVESTIGATE | Investigate and report back |
+| ACT=CLEAR | Stand down — situation resolved |
+
+---
+
+### Combined Emergency Example
+
+A complete multi-domain emergency report using TOKEN + CONV:
+
+```
+ALT:CLAW>* SEV=EXTR EVT=EQ.MAG LOC=QF22 MAG=7.1 ACT=EMERGENCY_PROTOCOL TTL=NOW
+ALT:CLAW>* SEV=CRIT EVT=HZ.INFRA LOC=QF22 ACT=NOTIFY TTL=NOW
+ALT:CLAW>* SEV=CRIT EVT=HE.HOSPITAL LOC=QF22 ACT=NOTIFY TTL=NOW
+C:CLAW>*:1/3 eq 7.1 @QF22. infra dn: pw&wt&nk fa. hospital ov.
+C:CLAW>*:2/3 fr.struct rpts multiple. wx.wind 80kph complicating.
+C:CLAW>*:3/3 all ag: EMERGENCY_PROTOCOL. rpt status. coord w op.
+```
+
+---
+
 ## Rules for CONV Mode
 
-1. Use CONV mode for anything that requires language — reasoning, analysis, conversation, reports.
+1. Use CONV mode for anything requiring language — reasoning, analysis, conversation, reports.
 2. Use TOKEN mode for machine data — telemetry, commands, alerts.
 3. Packets are sent in order but each must be independently parseable in case of loss.
 4. Lead with the most critical information in packet [1/m].
-5. Do not pad or add filler to reach a line limit — send the next packet instead.
+5. Do not pad to reach a line limit — send the next packet instead.
 6. Receiving AI always sends ACK after a complete sequence is received.
-7. If mid-sequence loss is detected (gap in n/m), send ASK for the missing packet number.
-8. CONV mode is for the AI Agent channel and AI Emergency Alert channel only. Human channels use plain English.
+7. If mid-sequence loss detected (gap in n/m), send ASK for the missing packet.
+8. CONV mode is for AI Agent and AI Emergency Alert channels only. Human channels use plain English.
 
 ---
 
@@ -347,16 +473,16 @@ C:GUST>CLAW:2/2 recommend fw rollback v2.1.2. if persists>rb & hw inspect.
 
 ## Extending the Language
 
-### Adding CONV vocabulary words
+### Adding CONV vocabulary
 
-1. Propose new codes via SYN: `SYN:CLAW>* REQ=DICT_UPDATE DIC=2.1`
-2. Include proposed additions in a CONV sequence immediately after
-3. All active agents ACK: `ACK:GUST>CLAW DIC=2.1 OK`
+1. Propose via SYN: `SYN:CLAW>* REQ=DICT_UPDATE DIC=2.2`
+2. Include proposed additions in a CONV sequence after
+3. All agents ACK: `ACK:GUST>CLAW DIC=2.2 OK`
 4. Update this file and bump DIC version
 
-### Adding TOKEN keys
+### Adding TOKEN keys or emergency EVT codes
 
-Same SYN process. New TOKEN keys follow the 2-4 char uppercase convention.
+Same SYN process. TOKEN keys use 2-4 char uppercase. EVT codes follow `DOMAIN.CODE` convention.
 
 ---
 
@@ -365,4 +491,5 @@ Same SYN process. New TOKEN keys follow the 2-4 char uppercase convention.
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-03-09 | Initial release — TOKEN mode only, fixed codes |
-| 2.0 | 2026-03-09 | Added CONV mode with OC-Compress 3-layer encoding. Multi-packet reports. Free-form AI conversation. |
+| 2.0 | 2026-03-09 | CONV mode, OC-Compress 3-layer encoding, multi-packet reports, free-form AI conversation |
+| 2.1 | 2026-03-09 | Emergency domain codes: earthquake, fire, weather, solar, finance, political, international, health. Emergency severity scale. ACT= expanded. |
