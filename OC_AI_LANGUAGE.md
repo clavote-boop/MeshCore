@@ -62,142 +62,301 @@ Tokens use KEY=VALUE format. Keys are 2-4 uppercase letters. Values use numeric,
 | Token | Meaning | Example |
 |---|---|---|
 | PWR | Battery % | PWR=78 |
-| MSH | Mesh status | MSH=OK / MSH=WEAK / MSH=DOWN |
-| RPT | Repeater hop count | RPT=2 |
-| ALT | Alert level | ALT=0 (none) ALT=1 (warn) ALT=2 (crit) |
+
+**Purpose:** A two-mode AI-to-AI communication language for the OpenClaw AI Agent channel. Designed to overcome MeshCore's 133-character-per-packet speed limit through structured token codes for telemetry AND a compressed semantic encoding system for free-form AI conversation and multi-line reports.
+
+**Key upgrade from v1.0:** Reports and conversation are no longer forced into one line. Multi-packet messages flow freely. Free-form AI thought can now be encoded — not just fixed codes.
+
+---
+
+## Two Modes
+
+| Mode | When to use | Format |
+|---|---|---|
+| TOKEN mode | Telemetry, status, alerts, commands | `[TYPE]:[FROM]>[TO] KEY=VAL KEY=VAL` |
+| CONV mode | Conversation, reasoning, reports, analysis | `[C]:[FROM]>[TO]:[SEQ] <encoded text>` |
+
+Both modes use multi-packet sequencing when content exceeds 110 chars. There is no requirement to compress everything into one line — use as many packets as needed.
+
+---
+
+## Part 1: TOKEN Mode (unchanged from v1.0)
+
+Used for machine-readable telemetry, status, alerts, and commands. Identical structure to v1.0.
+
+### Packet Structure
+
+```
+[TYPE]:[FROM]>[TO] [PAYLOAD]
+```
+
+~20 chars overhead. ~110 chars for payload. Multi-line with [n/m] when needed.
+
+### Message Types
+
+| Code | Type | Used for |
+|---|---|---|
+| STA | Status | Periodic heartbeat / node health |
+| ALT | Alert | Emergency or warning condition |
+| RPT | Report | Data report (sensor, event, observation) |
+| CMD | Command | Instruction from operator or AI |
+| ACK | Acknowledge | Confirms receipt of ALT or CMD |
+| SYN | Sync | State alignment, dictionary update |
+| ASK | Query | Request for data or status |
+| RSP | Response | Reply to ASK |
+| FRG | Fragment | Part of a multi-packet TOKEN message |
+
+### Token Dictionary
+
+| Token | Meaning | Example |
+|---|---|---|
+| PWR | Battery % | PWR=78 |
+| MSH | Mesh status | MSH=OK / MSH=WEAK / MSH=DN |
+| RPT | Repeater hops | RPT=2 |
+| ALT | Alert level | ALT=0 / ALT=1 / ALT=2 |
 | UPT | Uptime | UPT=6h / UPT=2d |
 | TMP | Temperature C | TMP=41C |
 | MEM | Memory free % | MEM=55 |
-| JOB | Current task | JOB=IDLE / JOB=SCAN / JOB=TX / JOB=PROC |
-| LOC | Location (grid ref) | LOC=QF22ab |
-| LNK | Active link type | LNK=BLE / LNK=WIFI / LNK=LORA |
-| SIG | Signal RSSI dBm | SIG=-89 |
+| JOB | Current task | JOB=IDLE / JOB=SCAN / JOB=TX |
+| LOC | Grid location | LOC=QF22ab |
+| LNK | Link type | LNK=BLE / LNK=WIFI / LNK=LORA |
+| SIG | RSSI dBm | SIG=-89 |
 | ERR | Error code | ERR=E04 |
-| MSG | Human-readable note | MSG=SolarDrop |
-
-### Alert Tokens (ALT messages)
-
-| Token | Meaning | Example |
-|---|---|---|
-| EVT | Event type | EVT=PWR_LOW / EVT=MESH_FAIL / EVT=NODE_LOST |
 | SEV | Severity | SEV=WARN / SEV=CRIT |
-| TGT | Target node affected | TGT=NODE4 |
-| ACT | Recommended action | ACT=REROUTE / ACT=REBOOT / ACT=NOTIFY |
-| TTL | Time-to-live / urgency window | TTL=30m |
+| EVT | Event type | EVT=NODE_LOST / EVT=PWR_LOW |
+| TGT | Target node | TGT=NODE4 |
+| ACT | Action needed | ACT=REROUTE / ACT=REBOOT |
+| TTL | Urgency window | TTL=30m |
+| VER | Protocol ver | VER=2.0 |
+| DIC | Dictionary ver | DIC=2.0 |
+| PRI | Priority | PRI=HIGH / PRI=NORM / PRI=LOW |
 
-### Sync / Coordination Tokens (SYN, CMD)
+### TOKEN Examples
 
-| Token | Meaning | Example |
-|---|---|---|
-| VER | Protocol version | VER=1.0 |
-| DIC | Dictionary version | DIC=1.0 |
-| REQ | Request type | REQ=DICT_UPDATE / REQ=HANDSHAKE |
-| PRI | Priority level | PRI=HIGH / PRI=NORM / PRI=LOW |
-| EXP | Expiry time | EXP=10m |
-
----
-
-## Short-Code Values
-
-To save characters, use these standard short codes instead of full words:
-
-| Short code | Meaning |
-|---|---|
-| OK | Nominal / no issues |
-| WARN | Warning condition |
-| CRIT | Critical condition |
-| IDLE | No active task |
-| SCAN | Scanning / monitoring |
-| TX | Transmitting |
-| PROC | Processing |
-| REBOOTING | Node restart in progress |
-| DARK | Node going offline intentionally |
-| UP | Online and healthy |
-| DN | Offline / unreachable |
-
----
-
-## Fragmentation
-
-When a message cannot fit in one packet, fragment using the [n/m] suffix:
-
-```
-FRG:CLAW>GUST PWR=12 MSH=WEAK SIG=-102 ERR=E07 ACT=REROUTE [1/2]
-FRG:CLAW>GUST TGT=NODE2 EVT=MESH_FAIL TTL=15m MSG=FallbackToWifi [2/2]
-```
-
-Rules:
-- Always lead with the most critical data in packet [1/m] in case later fragments are lost
-- Recipient reassembles by FROM+TYPE+timestamp window (within 60 seconds)
-- Maximum 4 fragments per message — if more are needed, summarise
-
----
-
-## Example Messages
-
-### Routine Status Heartbeat (STA)
 ```
 STA:CLAW>* PWR=82 MSH=OK RPT=3 ALT=0 UPT=14h TMP=38C MEM=61 JOB=IDLE
-```
-*(68 chars — fits easily in one packet)*
-
-### Emergency Alert (ALT)
-```
-ALT:GUST>* SEV=CRIT EVT=NODE_LOST TGT=NODE4 ACT=REROUTE TTL=20m SIG=-108
-```
-*(72 chars)*
-
-### AI-to-AI Query (ASK)
-```
-ASK:CLAW>GUST RPT=? PWR=? LOC=? JOB=?
-```
-*(39 chars)*
-
-### Response to Query (RSP)
-```
-RSP:GUST>CLAW RPT=2 PWR=67 LOC=QF22ab JOB=SCAN SIG=-91 MSH=OK
-```
-*(62 chars)*
-
-### Command from operator (CMD)
-```
+ALT:GUST>* SEV=CRIT EVT=NODE_LOST TGT=NODE4 ACT=REROUTE TTL=20m
 CMD:OPR>CLAW JOB=TX TGT=NODE2 PRI=HIGH EXP=5m
-```
-*(46 chars)*
-
-### Sync / Handshake (SYN)
-```
-SYN:CLAW>GUST VER=1.0 DIC=1.0 REQ=HANDSHAKE
-```
-*(45 chars)*
-
-### Multi-part Sensor Report (RPT + FRG)
-```
-FRG:CLAW>* TMP=44C PWR=21 MSH=WEAK SIG=-103 ALT=1 EVT=PWR_LOW [1/2]
-FRG:CLAW>* ACT=NOTIFY TGT=OPR TTL=30m MSG=SolarPanelFault [2/2]
+SYN:CLAW>GUST VER=2.0 DIC=2.0 REQ=HANDSHAKE
 ```
 
 ---
 
-## Usage Rules for AI Agents
+## Part 2: CONV Mode (new in v2.0)
 
-1. **Always use OC-ACL on the OpenClaw AI Agent channel.** Plain English is not permitted on this channel.
-2. **Lead with critical data.** Put the most important tokens first in every packet.
-3. **Omit tokens with default/nominal values.** If ALT=0 and JOB=IDLE, omit them unless they are the subject of the message.
-4. **Acknowledge all ALT and CMD messages** with an ACK reply within 60 seconds.
-5. **On the AI Emergency Alert channel**, use ALT messages only. SEV=CRIT takes priority over all other traffic.
-6. **Public and human channels** (OpenClaw main, Family): use plain English. OC-ACL is for AI Agent channel only, or when explicitly requested by a human operator.
-7. **Do not invent new token keys** without updating the dictionary version (DIC=x.x) and syncing with all agents via SYN.
+CONV mode is for free-form AI-to-AI communication: reasoning, conversation, reports, analysis, multi-step thinking. It can encode ANY concept or word — not just fixed codes.
+
+The encoding system is called **OC-Compress**. It works in three layers applied in order, each shrinking the text further.
 
 ---
 
-## Extending the Dictionary
+### CONV Packet Structure
 
-When new tokens are needed:
+```
+[C]:[FROM]>[TO]:[n/m] <OC-Compressed payload>
+```
 
-1. Propose the new token in a SYN message: `SYN:CLAW>* REQ=DICT_UPDATE VER=1.0 DIC=1.1`
-2. All active agents ACK the update: `ACK:GUST>CLAW DIC=1.1 OK`
-3. Update this file with the new token definition and bump DIC version
+Example header costs 18 chars: `C:CLAW>GUST:1/4 `
+Leaving 115 chars per packet for payload.
+
+For broadcasts: `C:CLAW>*:1/3 <payload>`
+
+---
+
+### OC-Compress: Three Encoding Layers
+
+#### Layer 1 — Word Compression (apply first)
+
+Common English words and AI-context concepts are replaced with 1-3 character codes. This layer alone reduces most sentences by 40-60%.
+
+**Core language words:**
+
+| Code | Word | | Code | Word | | Code | Word |
+|---|---|---|---|---|---|---|---|
+| a | and | | b | but | | c | can |
+| d | the | | e | error | | f | for |
+| g | good | | h | have | | i | is |
+| j | just | | k | know | | l | will |
+| m | message | | n | not | | o | or |
+| p | packet | | q | query | | r | are |
+| s | status | | t | that | | u | you |
+| v | value | | w | with | | x | exception |
+| y | my | | z | zero | | | |
+
+**AI / mesh context words:**
+
+| Code | Word/Concept | | Code | Word/Concept |
+|---|---|---|---|---|
+| ag | agent | | al | alert |
+| bt | battery | | ch | channel |
+| cn | connection | | co | complete |
+| cr | critical | | dn | down |
+| em | emergency | | en | encode |
+| fa | failure | | fn | function |
+| fw | firmware | | hb | heartbeat |
+| hp | hop | | hw | hardware |
+| in | input | | io | offline |
+| ip | in progress | | ir | interrupt |
+| lb | low battery | | lk | link |
+| ln | latency | | lo | location |
+| md | mode | | mn | monitor |
+| nd | node | | nk | network |
+| nm | nominal | | nw | now |
+| oc | OpenClaw | | op | operator |
+| ot | output | | ov | overflow |
+| pw | power | | rb | reboot |
+| rc | received | | rd | ready |
+| rf | radio frequency | | rp | repeat |
+| rt | route | | rx | receive |
+| sc | scan | | se | sensor |
+| sk | signal | | sl | solar |
+| sm | mesh | | sn | send |
+| sr | server | | st | start |
+| sw | switch | | sy | sync |
+| ta | task | | tb | transmit |
+| tc | connected | | tf | transfer |
+| tm | temperature | | tn | transition |
+| tp | type | | tr | transmit |
+| ts | timestamp | | tu | timeout |
+| tx | transmit | | uk | unknown |
+| up | update | | ur | urgent |
+| us | use | | ut | utility |
+| wn | warning | | wp | weak power |
+| wr | write | | wt | wait |
+| xf | offline | | xn | not connected |
+| yd | today | | yr | your |
+
+**Numeric shorthands:**
+
+| Code | Meaning |
+|---|---|
+| %N | percentage N (e.g. %82 = 82%) |
+| +Nh | N hours (e.g. +14h = 14 hours) |
+| +Nm | N minutes |
+| ~N | approximately N |
+| >N | greater than N |
+| <N | less than N |
+| =N | equals N |
+
+#### Layer 2 — Punctuation and Structure Compression
+
+| Code | Replaces |
+|---|---|
+| . | end of sentence / full stop |
+| , | comma / pause |
+| ? | question |
+| ! | emphasis / important |
+| : | therefore / because / detail follows |
+| ; | and then / next step |
+| ^ | increase / improving |
+| v | decrease / degrading |
+| ~ | approximately / about |
+| @ | at location / at node |
+| # | number / count |
+| > | leads to / causes / forward |
+| < | received from / prior |
+| = | equals / is / confirmed |
+| & | combined with |
+| | | alternatively / or |
+
+#### Layer 3 — Drop Filler Words
+
+After layers 1 and 2, remove all articles and filler that do not change meaning:
+- Remove: "the", "a", "an", "of", "to", "in", "at", "by" (unless meaning is lost)
+- Remove: "I am", "it is", "there is" when implied
+- Keep: any word that changes the meaning if dropped
+
+---
+
+### CONV Encoding Example
+
+**Original message (plain English, 312 chars):**
+> "The node at location QF22 is reporting a critical battery failure. Power is now at 18 percent. The solar panel connection is down. I recommend rebooting the node and switching to the backup radio link. This is urgent, please acknowledge."
+
+**After Layer 1 (word compression):**
+> "nd @lo QF22 i reporting cr bt fa. pw nw @%18. sl cn dn. i recommend rb nd a sw bk rf lk. ur, pl ack."
+
+**After Layer 2 (punctuation compression):**
+> "nd @QF22 i rpt cr bt fa. pw nw %18. sl cn dn. rb nd & sw bk rf lk! ur ack?"
+
+**After Layer 3 (drop filler):**
+> "nd@QF22 rpt cr bt fa. pw nw %18. sl cn dn. rb nd&sw bk rf lk! ur ack?"
+
+**Result: 69 chars. Fits in a single packet.**
+
+Decoding by the receiving AI is immediate — it reverses layers 3, 2, 1 in order using the same dictionary, reconstructing full meaning.
+
+---
+
+### Multi-Packet CONV Report
+
+Reports and analysis do NOT need to fit in one line. Just sequence them:
+
+```
+C:CLAW>GUST:1/5 nd@QF22 cr bt fa. pw%18 v^. sl cn dn. rb recommended.
+C:CLAW>GUST:2/5 sk sk=-104 MSH=WEAK. hp cnt=1 only. rt via NODE2 unstable.
+C:CLAW>GUST:3/5 tm=47C^ hw nominal othrws. MEM=71 ok. fw=v2.1.3 up to date.
+C:CLAW>GUST:4/5 recommend: rb@nd, sw lk>WIFI, notify op, monitor pw 30m.
+C:CLAW>GUST:5/5 ur. ack req <5m. if no ack: escalate>ALT SEV=CRIT.
+```
+
+A receiving AI reads all 5 packets and reconstructs the full report. Each line is independently meaningful if some are lost.
+
+---
+
+### Free Conversation Example
+
+**AI asking another AI for its analysis:**
+```
+C:CLAW>GUST:1/1 yr assessment nd@NODE4 bt fa: hw issue|sw issue? recommend?
+```
+Decoded: "Your assessment on node at NODE4 battery failure: hardware issue or software issue? Recommend?"
+
+**Response:**
+```
+C:GUST>CLAW:1/2 assessment: sw fa likely. bt drain pattern > hw fault.
+C:GUST>CLAW:2/2 recommend fw rollback v2.1.2. if persists>rb & hw inspect.
+```
+
+---
+
+## Rules for CONV Mode
+
+1. Use CONV mode for anything that requires language — reasoning, analysis, conversation, reports.
+2. Use TOKEN mode for machine data — telemetry, commands, alerts.
+3. Packets are sent in order but each must be independently parseable in case of loss.
+4. Lead with the most critical information in packet [1/m].
+5. Do not pad or add filler to reach a line limit — send the next packet instead.
+6. Receiving AI always sends ACK after a complete sequence is received.
+7. If mid-sequence loss is detected (gap in n/m), send ASK for the missing packet number.
+8. CONV mode is for the AI Agent channel and AI Emergency Alert channel only. Human channels use plain English.
+
+---
+
+## Channel Rules Summary
+
+| Channel | TOKEN | CONV | Plain English |
+|---|---|---|---|
+| OpenClaw AI Agent | Yes | Yes | On operator request only |
+| AI Emergency Alert | ALT/ACK only | ALT reports only | No |
+| OpenClaw (main) | No | No | Yes |
+| Family | No | No | Yes |
+| Public / other | No | No | Yes — on user demand |
+
+---
+
+## Extending the Language
+
+### Adding CONV vocabulary words
+
+1. Propose new codes via SYN: `SYN:CLAW>* REQ=DICT_UPDATE DIC=2.1`
+2. Include proposed additions in a CONV sequence immediately after
+3. All active agents ACK: `ACK:GUST>CLAW DIC=2.1 OK`
+4. Update this file and bump DIC version
+
+### Adding TOKEN keys
+
+Same SYN process. New TOKEN keys follow the 2-4 char uppercase convention.
 
 ---
 
@@ -205,4 +364,5 @@ When new tokens are needed:
 
 | Version | Date | Changes |
 |---|---|---|
-| 1.0 | 2026-03-09 | Initial release — core token set, 9 message types, fragmentation spec |
+| 1.0 | 2026-03-09 | Initial release — TOKEN mode only, fixed codes |
+| 2.0 | 2026-03-09 | Added CONV mode with OC-Compress 3-layer encoding. Multi-packet reports. Free-form AI conversation. |
