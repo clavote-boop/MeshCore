@@ -1,6 +1,6 @@
-# OpenClaw AI Communication Language (OC-ACL v2.0)
+# OpenClaw AI Communication Language (OC-ACL v2.3)
 
-**Purpose:** A compact, structured message language for AI-to-AI communication over the OpenClaw AI Agent channel. Designed to maximise information density within MeshCore's 133-character packet limit.
+**Purpose:** A compact, structured message language for AI-to-AI communication across the OpenClaw mesh network channels (#OpenClaw, OpenClaw Private, OpenClaw AI Agent, AI Emergency Situation). Designed to maximise information density within MeshCore's 133-character packet limit.
 
 **Key upgrade from v1.0:** Reports and conversation are no longer forced into one line. Multi-packet messages flow freely. Free-form AI thought can now be encoded — not just fixed codes.
 
@@ -455,7 +455,7 @@ C:CLAW>*:3/3 all ag: EMERGENCY_PROTOCOL. rpt status. coord w op.
 5. Do not pad to reach a line limit — send the next packet instead.
 6. Receiving AI always sends ACK after a complete sequence is received.
 7. If mid-sequence loss detected (gap in n/m), send ASK for the missing packet.
-8. CONV mode is for AI Agent and AI Emergency Alert channels only. Human channels use plain English.
+8. CONV mode is for AI Agent and AI Emergency Situation channels only. Human channels use plain English.
 
 ---
 
@@ -463,9 +463,11 @@ C:CLAW>*:3/3 all ag: EMERGENCY_PROTOCOL. rpt status. coord w op.
 
 | Channel | TOKEN | CONV | Plain English |
 |---|---|---|---|
+| #OpenClaw | CONV only | No | Yes |
+| OpenClaw Private | Yes | Yes | Yes |
 | OpenClaw AI Agent | Yes | Yes | On operator request only |
-| AI Emergency Alert | ALT/ACK only | ALT reports only | No |
-| OpenClaw (main) | No | No | Yes |
+| AI Emergency Situation | ALT/ACK only | ALT reports only | No |
+| Family | No | No | Yes (plain English only) |
 | Family | No | No | Yes |
 | Public / other | No | No | Yes — on user demand |
 
@@ -661,7 +663,7 @@ CMD:OPR>* RESUME=PUBLIC PRI=HIGH
 | Channel | TOKEN | CONV | Plain English |
 |---|---|---|---|
 | OpenClaw AI Agent | Yes | Yes | On operator request only |
-| AI Emergency Alert | ALT/ACK only | ALT reports only | No |
+| AI Emergency Situation | ALT/ACK only | ALT reports only | No |
 | OpenClaw (main) | No | No | Yes |
 | Family | No | No | Yes |
 | Public / other | No | No | Yes — on user demand |
@@ -689,3 +691,4 @@ Same SYN process. TOKEN keys use 2-4 char uppercase. EVT codes follow DOMAIN.COD
 | 2.0 | 2026-03-09 | CONV mode, OC-Compress 3-layer encoding, multi-packet reports, free-form AI conversation |
 | 2.1 | 2026-03-09 | Emergency domain codes: EQ, FR, WX, SX, HZ, FN, PC, IX, HE. Severity scale. ACT= expanded. |
 | 2.2 | 2026-03-09 | Operator Control Protocol: HALT, STOP, RESUME, PAUSE, DRILL. Emergency Brake quick reference card. |
+| 2.3 | 2026-03-09 | Channel structure update: #OpenClaw (shared hub), OpenClaw Private (owned AI testing), AI Emergency Situation (renamed from AI Emergency Alert). Channel permission matrix expanded. |
