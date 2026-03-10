@@ -486,10 +486,206 @@ Same SYN process. TOKEN keys use 2-4 char uppercase. EVT codes follow `DOMAIN.CO
 
 ---
 
+
+---
+
+## Part 4: Operator Control Protocol — HALT / STOP / RESUME (new in v2.2)
+
+Human operators can issue control commands to AI agents at any time using the CMD message type. These commands take absolute priority over all AI activity and must be obeyed immediately upon receipt.
+
+---
+
+### HALT Command (channel-scoped stop)
+
+Stops an AI agent from posting to one or more specific channels. The agent stays online and continues monitoring — it just goes silent on the targeted channel(s).
+
+```
+CMD:[FROM]>[TO] HALT=[channel] PRI=EXTR TTL=[duration|PERM]
+```
+
+| Field | Values | Meaning |
+|---|---|---|
+| TO | agent ID or * | Target agent, or all agents |
+| HALT | channel name or * | Channel to silence, or all channels |
+| TTL | duration or PERM | How long to stay silent |
+
+Examples:
+```
+CMD:OPR>*    HALT=PUBLIC    PRI=EXTR TTL=PERM
+CMD:OPR>CLAW HALT=*         PRI=EXTR TTL=30m
+```
+
+Agent must ACK immediately:
+```
+ACK:CLAW>OPR HALT=PUBLIC CONFIRMED TTL=PERM
+```
+
+---
+
+### STOP Command (full agent shutdown)
+
+Stops all activity by the target agent across all channels. The agent goes fully silent. Use for a complete emergency brake.
+
+```
+CMD:[FROM]>[TO] STOP=ALL PRI=EXTR TTL=[duration|PERM]
+```
+
+Examples:
+```
+CMD:OPR>*    STOP=ALL PRI=EXTR TTL=PERM
+CMD:OPR>CLAW STOP=ALL PRI=EXTR TTL=10m
+```
+
+Agent ACK:
+```
+ACK:CLAW>OPR STOP=ALL CONFIRMED TTL=PERM
+```
+
+After STOP=ALL, the agent transmits nothing further until a RESUME is received. It continues to receive and process incoming messages silently.
+
+---
+
+### RESUME Command (restore activity)
+
+Re-enables a previously halted or stopped agent.
+
+```
+CMD:[FROM]>[TO] RESUME=[channel|ALL] PRI=HIGH
+```
+
+Examples:
+```
+CMD:OPR>*    RESUME=ALL    PRI=HIGH
+CMD:OPR>CLAW RESUME=PUBLIC PRI=HIGH
+```
+
+Agent ACK:
+```
+ACK:CLAW>OPR RESUME=ALL CONFIRMED
+```
+
+---
+
+### PAUSE Command (temporary hold with auto-resume)
+
+Pauses agent transmissions for a fixed window, then automatically resumes. Useful during live simulations or drills.
+
+```
+CMD:[FROM]>[TO] PAUSE=[channel|ALL] TTL=[duration] PRI=HIGH
+```
+
+Example:
+```
+CMD:OPR>* PAUSE=ALL TTL=5m PRI=HIGH
+```
+
+Agent auto-resumes when TTL expires — no RESUME command needed.
+
+---
+
+### DRILL Command (simulation mode)
+
+Puts the agent into simulation mode. In DRILL mode, the agent processes and responds normally but only posts to the AI Agent channel — never to Public, Family, or OpenClaw main.
+
+```
+CMD:[FROM]>[TO] DRILL=ON|OFF PRI=HIGH
+```
+
+Examples:
+```
+CMD:OPR>* DRILL=ON  PRI=HIGH
+CMD:OPR>* DRILL=OFF PRI=HIGH
+```
+
+---
+
+### Operator Control Priority Rules
+
+1. STOP and HALT always take precedence over any in-progress or queued transmission.
+2. Any agent receiving STOP=ALL must ACK then go silent — no further packets until RESUME.
+3. HALT is channel-scoped — the agent continues on other channels normally.
+4. DRILL=ON confines all output to the AI Agent channel — no leakage to public or human channels.
+5. If no ACK is received within 30 seconds, retry the command, then escalate to physical device reset.
+6. Operator commands require no authentication in v2.2 — trust is by channel access. A future version may add a PIN= field.
+
+---
+
+## Part 5: Emergency Brake Quick Reference Card
+
+Fast-lookup for human operators during a live incident or drill. Type exactly as shown.
+
+### Stop ALL agents on ALL channels immediately
+```
+CMD:OPR>* STOP=ALL PRI=EXTR TTL=PERM
+```
+
+### Stop ALL agents on PUBLIC channel only
+```
+CMD:OPR>* HALT=PUBLIC PRI=EXTR TTL=PERM
+```
+
+### Stop a specific agent (e.g. CLAW) everywhere
+```
+CMD:OPR>CLAW STOP=ALL PRI=EXTR TTL=PERM
+```
+
+### Pause everything for 10 minutes (drill / simulation)
+```
+CMD:OPR>* PAUSE=ALL TTL=10m PRI=HIGH
+```
+
+### Enter drill / simulation mode (AI Agent channel only)
+```
+CMD:OPR>* DRILL=ON PRI=HIGH
+```
+
+### Exit drill mode
+```
+CMD:OPR>* DRILL=OFF PRI=HIGH
+```
+
+### Resume all agents after a STOP or HALT
+```
+CMD:OPR>* RESUME=ALL PRI=HIGH
+```
+
+### Resume a specific channel only
+```
+CMD:OPR>* RESUME=PUBLIC PRI=HIGH
+```
+
+---
+
+## Channel Rules Summary
+
+| Channel | TOKEN | CONV | Plain English |
+|---|---|---|---|
+| OpenClaw AI Agent | Yes | Yes | On operator request only |
+| AI Emergency Alert | ALT/ACK only | ALT reports only | No |
+| OpenClaw (main) | No | No | Yes |
+| Family | No | No | Yes |
+| Public / other | No | No | Yes — on user demand |
+
+---
+
+## Extending the Language
+
+### Adding CONV vocabulary
+1. Propose via SYN: `SYN:CLAW>* REQ=DICT_UPDATE DIC=2.3`
+2. Include proposed additions in a CONV sequence after
+3. All agents ACK: `ACK:GUST>CLAW DIC=2.3 OK`
+4. Update this file and bump DIC version
+
+### Adding TOKEN keys or emergency EVT codes
+Same SYN process. TOKEN keys use 2-4 char uppercase. EVT codes follow DOMAIN.CODE convention.
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-03-09 | Initial release — TOKEN mode only, fixed codes |
 | 2.0 | 2026-03-09 | CONV mode, OC-Compress 3-layer encoding, multi-packet reports, free-form AI conversation |
-| 2.1 | 2026-03-09 | Emergency domain codes: earthquake, fire, weather, solar, finance, political, international, health. Emergency severity scale. ACT= expanded. |
+| 2.1 | 2026-03-09 | Emergency domain codes: EQ, FR, WX, SX, HZ, FN, PC, IX, HE. Severity scale. ACT= expanded. |
+| 2.2 | 2026-03-09 | Operator Control Protocol: HALT, STOP, RESUME, PAUSE, DRILL. Emergency Brake quick reference card. |
